@@ -1,0 +1,91 @@
+@model Auth01.Models.ProductViewModel
+@{
+    ViewData["Title"] = "Product Details";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="fas fa-box me-2"></i>Product Details
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h3 class="text-primary mb-3">@Model.Name</h3>
+                            
+                            @if (!string.IsNullOrEmpty(Model.Description))
+                            {
+                                <div class="mb-3">
+                                    <h6 class="text-muted">Description</h6>
+                                    <p class="mb-0">@Model.Description</p>
+                                </div>
+                            }
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted">Price</h6>
+                                    <span class="badge bg-success fs-5">@Model.Price</span>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="text-muted">Stock Quantity</h6>
+                                    @if (Model.StockQuantity > 0)
+                                    {
+                                        <span class="badge bg-primary fs-5">@Model.StockQuantity</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger fs-5">Out of Stock</span>
+                                    }
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted">Created At</h6>
+                                    <small class="text-muted">@Model.CreatedAt.ToString("MMM dd, yyyy 'at' HH:mm")</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="text-muted">Created By</h6>
+                                    <small class="text-muted">@Model.CreatedByName</small>
+                                </div>
+                            </div>
+                            
+                            @if (Model.UpdatedAt.HasValue)
+                            {
+                                <div class="mb-3">
+                                    <h6 class="text-muted">Last Updated</h6>
+                                    <small class="text-muted">@Model.UpdatedAt.Value.ToString("MMM dd, yyyy 'at' HH:mm")</small>
+                                </div>
+                            }
+                        </div>
+                        
+                        <div class="col-md-4 text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-box fa-5x text-primary"></i>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-warning">
+                                    <i class="fas fa-edit me-2"></i>Edit Product
+                                </a>
+                                <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-danger">
+                                    <i class="fas fa-trash me-2"></i>Delete Product
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a asp-action="Index" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to List
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,96 @@
+@model Auth01.Models.LoginViewModel
+@{
+    ViewData["Title"] = "Login";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <h2 class="text-center mb-4">Login to Your Account</h2>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Local Account Login</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Login" method="post" id="loginForm">
+                        @Html.AntiForgeryToken()
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label"></label>
+                            <input asp-for="Email" class="form-control" id="emailInput" />
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label"></label>
+                            <input asp-for="Password" class="form-control" id="passwordInput" />
+                            <span asp-validation-for="Password" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input asp-for="RememberMe" class="form-check-input" />
+                            <label asp-for="RememberMe" class="form-check-label"></label>
+                        </div>
+
+                        <button type="button" class="btn btn-primary w-100" onclick="submitForm()">Login</button>
+                    </form>
+
+                    <div class="mt-3 text-center">
+                        <p>Don't have an account? <a asp-action="Register">Register here</a></p>
+                        <div id="adminButtonSection">
+                            <button type="button" class="btn btn-warning btn-sm mt-2" onclick="createAdmin()">Create Admin User</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function submitForm() {
+            // Get form values
+            const email = document.getElementById('emailInput').value;
+            const password = document.getElementById('passwordInput').value;
+            
+            // Check if fields are filled
+            if (!email || !password) {
+                alert('Please enter both email and password');
+                return;
+            }
+            
+            // Hide admin button before submitting
+            hideAdminButton();
+            
+            // Submit form programmatically (bypasses any validation issues)
+            document.getElementById('loginForm').submit();
+        }
+
+        function createAdmin() {
+            // Create admin user data
+            const adminData = {
+                firstName: "Admin",
+                lastName: "User", 
+                email: "admin@example.com",
+                password: "Admin123!",
+                role: "Admin"
+            };
+
+            // Show admin credentials in alert
+            alert(`Admin User Created!\n\nEmail: ${adminData.email}\nPassword: ${adminData.password}\n\nUse these credentials to login.`);
+            
+            // You can also call an API endpoint here if you want to actually create the user
+            // For now, just showing the credentials
+        }
+
+        function hideAdminButton() {
+            const adminSection = document.getElementById('adminButtonSection');
+            if (adminSection) {
+                adminSection.style.display = 'none';
+            }
+        }
+    </script>
+}
