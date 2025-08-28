@@ -2,8 +2,9 @@
   "ExpandedNodes": [
     "",
     "\\Auth01",
-    "\\Auth01\\Controllers"
+    "\\Auth01\\Migrations",
+    "\\Auth01\\Services"
   ],
-  "SelectedNode": "\\Auth01.sln",
+  "SelectedNode": "\\Auth01\\Migrations\\20250827093410_UpdatePasswordField.cs",
   "PreviewInSolutionExplorer": false
 }

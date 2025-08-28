@@ -179,3 +179,4 @@ F:\Auth02\Auth01\bin\Debug\net8.0\vault-keys.json
 F:\Auth02\Auth01\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 F:\Auth02\Auth01\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.OpenIdConnect.dll
 F:\Auth02\Auth01\bin\Debug\net8.0\Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll
+F:\Auth02\Auth01\obj\Debug\net8.0\Auth01.sourcelink.json

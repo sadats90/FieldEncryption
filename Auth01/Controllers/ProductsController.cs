@@ -28,55 +28,66 @@ namespace Auth01.Controllers
             _vaultService = vaultService;
         }
 
+        private (int userId, bool isAdmin) GetUserContext()
+        {
+            int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId);
+            bool isAdmin = User.FindFirstValue(ClaimTypes.Role) == "Admin";
+            return (userId, isAdmin);
+        }
+
+        private async Task<Product?> GetOwnedProductAsync(int id, int userId) =>
+            await _context.Products.Include(p => p.CreatedBy)
+                                   .FirstOrDefaultAsync(p => p.Id == id && p.CreatedById == userId);
+
         // GET: Products
         public async Task<IActionResult> Index()
         {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdClaim, out int userId)) return Unauthorized();
+            var (userId, isAdmin) = GetUserContext();
+            if (userId == 0) return Unauthorized();
 
-            var userRole = User.FindFirstValue(ClaimTypes.Role);
-            bool isAdmin = userRole == "Admin";
-
-            IQueryable<Product> query = _context.Products.Include(p => p.CreatedBy);
-            if (!isAdmin) query = query.Where(p => p.CreatedById == userId);
-
-            var products = await query
+            // Materialize first to avoid EF translation issues
+            var products = await _context.Products
+                .Include(p => p.CreatedBy)
+                .Where(p => isAdmin || p.CreatedById == userId)
                 .OrderByDescending(p => p.CreatedAt)
-                .Select(p => new ProductViewModel
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Description = (p.CreatedById == userId || isAdmin)
-                        ? _encryptionService.Decrypt(p.Description ?? string.Empty, _vaultService.GetOrCreateUserKey(p.CreatedById))
-                        : "********",
-                    Price = p.Price,
-                    StockQuantity = p.StockQuantity,
-                    CreatedAt = p.CreatedAt,
-                    UpdatedAt = p.UpdatedAt,
-                    CreatedByName = p.CreatedBy != null ? $"{p.CreatedBy.FirstName} {p.CreatedBy.LastName}" : "Unknown"
-                })
                 .ToListAsync();
 
-            return View(products);
+            var productViewModels = products.Select(p => new ProductViewModel
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Description = (p.CreatedById == userId || isAdmin)
+                    ? _encryptionService.Decrypt(p.Description ?? string.Empty,
+                        _vaultService.GetOrCreateUserKey(p.CreatedById))
+                    : "********",
+                Price = p.Price,
+                StockQuantity = p.StockQuantity,
+                CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt,
+                CreatedByName = p.CreatedBy != null
+                    ? $"{p.CreatedBy.FirstName} {p.CreatedBy.LastName}"
+                    : "Unknown"
+            }).ToList();
+
+            return View(productViewModels);
         }
 
         // GET: Products/Create
         public IActionResult Create() => View();
 
         // POST: Products/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Name,Description,Price,StockQuantity")] CreateProductViewModel viewModel)
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(CreateProductViewModel viewModel)
         {
             if (!ModelState.IsValid) return View(viewModel);
 
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdClaim, out int userId)) return Unauthorized();
+            var (userId, _) = GetUserContext();
+            if (userId == 0) return Unauthorized();
 
-            var userKey = _vaultService.GetOrCreateUserKey(userId);
-            var encryptedDescription = _encryptionService.Encrypt(viewModel.Description ?? string.Empty, userKey);
+            var encryptedDescription = _encryptionService.Encrypt(viewModel.Description ?? string.Empty,
+                _vaultService.GetOrCreateUserKey(userId));
 
-            var product = new Product
+            _context.Products.Add(new Product
             {
                 Name = viewModel.Name,
                 Description = encryptedDescription,
@@ -84,105 +95,82 @@ namespace Auth01.Controllers
                 StockQuantity = viewModel.StockQuantity,
                 CreatedById = userId,
                 CreatedAt = DateTime.UtcNow
-            };
+            });
 
-            _context.Add(product);
             await _context.SaveChangesAsync();
-
             TempData["SuccessMessage"] = "Product created successfully!";
             return RedirectToAction(nameof(Index));
         }
 
         // GET: Products/Edit/5
-        public async Task<IActionResult> Edit(int? id)
+        public async Task<IActionResult> Edit(int id)
         {
-            if (id == null) return NotFound();
-
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdClaim, out int userId)) return Unauthorized();
-
-            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == id && p.CreatedById == userId);
+            var (userId, _) = GetUserContext();
+            var product = await GetOwnedProductAsync(id, userId);
             if (product == null) return NotFound();
 
-            var decryptedDescription = _encryptionService.Decrypt(product.Description ?? string.Empty, _vaultService.GetOrCreateUserKey(userId));
-
-            var viewModel = new EditProductViewModel
+            return View(new EditProductViewModel
             {
                 Id = product.Id,
                 Name = product.Name,
-                Description = decryptedDescription,
+                Description = _encryptionService.Decrypt(product.Description ?? string.Empty,
+                    _vaultService.GetOrCreateUserKey(userId)),
                 Price = product.Price,
                 StockQuantity = product.StockQuantity
-            };
-
-            return View(viewModel);
+            });
         }
 
         // POST: Products/Edit/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Description,Price,StockQuantity")] EditProductViewModel viewModel)
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(EditProductViewModel viewModel)
         {
-            if (id != viewModel.Id) return NotFound();
-            if (!ModelState.IsValid) return View(viewModel);
-
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdClaim, out int userId)) return Unauthorized();
-
-            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == id && p.CreatedById == userId);
+            var (userId, _) = GetUserContext();
+            var product = await GetOwnedProductAsync(viewModel.Id, userId);
             if (product == null) return NotFound();
 
+            if (!ModelState.IsValid) return View(viewModel);
+
             product.Name = viewModel.Name;
-            product.Description = _encryptionService.Encrypt(viewModel.Description ?? string.Empty, _vaultService.GetOrCreateUserKey(userId));
+            product.Description = _encryptionService.Encrypt(viewModel.Description ?? string.Empty,
+                _vaultService.GetOrCreateUserKey(userId));
             product.Price = viewModel.Price;
             product.StockQuantity = viewModel.StockQuantity;
             product.UpdatedAt = DateTime.UtcNow;
 
-            _context.Update(product);
             await _context.SaveChangesAsync();
-
             TempData["SuccessMessage"] = "Product updated successfully!";
             return RedirectToAction(nameof(Index));
         }
 
         // GET: Products/Delete/5
-        public async Task<IActionResult> Delete(int? id)
+        public async Task<IActionResult> Delete(int id)
         {
-            if (id == null) return NotFound();
-
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdClaim, out int userId)) return Unauthorized();
-
-            var product = await _context.Products
-                .Include(p => p.CreatedBy)
-                .FirstOrDefaultAsync(p => p.Id == id && p.CreatedById == userId);
-
+            var (userId, _) = GetUserContext();
+            var product = await GetOwnedProductAsync(id, userId);
             if (product == null) return NotFound();
 
-            var viewModel = new ProductViewModel
+            return View(new ProductViewModel
             {
                 Id = product.Id,
                 Name = product.Name,
-                Description = _encryptionService.Decrypt(product.Description ?? string.Empty, _vaultService.GetOrCreateUserKey(userId)),
+                Description = _encryptionService.Decrypt(product.Description ?? string.Empty,
+                    _vaultService.GetOrCreateUserKey(userId)),
                 Price = product.Price,
                 StockQuantity = product.StockQuantity,
                 CreatedAt = product.CreatedAt,
                 UpdatedAt = product.UpdatedAt,
-                CreatedByName = product.CreatedBy != null ? $"{product.CreatedBy.FirstName} {product.CreatedBy.LastName}" : "Unknown"
-            };
-
-            return View(viewModel);
+                CreatedByName = product.CreatedBy != null
+                    ? $"{product.CreatedBy.FirstName} {product.CreatedBy.LastName}"
+                    : "Unknown"
+            });
         }
 
         // POST: Products/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
+        [HttpPost, ActionName("Delete"), ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdClaim, out int userId)) return Unauthorized();
-
-            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == id && p.CreatedById == userId);
+            var (userId, _) = GetUserContext();
+            var product = await GetOwnedProductAsync(id, userId);
             if (product != null)
             {
                 _context.Products.Remove(product);
